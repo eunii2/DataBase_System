@@ -27,7 +27,7 @@ public class ClubManagement {
             if (choice.equals("1")) {
                 userMenu(sc);
             } else if (choice.equals("2")) {
-                clubTopMenu(sc);
+                clubMainMenu(sc);
             } else if (choice.equals("3")) {
                 reservationMenu(sc);
             } else if (choice.equals("99")) {
@@ -64,7 +64,7 @@ public class ClubManagement {
     // ================== User 관리 ==================
     private static void userMenu(Scanner sc) {
         while (true) {
-            System.out.println("\n========User 관리========");
+            System.out.println("\n===User 관리===");
             System.out.println("1. User 등록");
             System.out.println("2. User 조회");
             System.out.println("3. User 수정(Major)");
@@ -189,35 +189,80 @@ public class ClubManagement {
         }
     }
 
-    // ================== Club 선택 후 하위 엔티티 관리 ==================
-    private static void clubTopMenu(Scanner sc) {
-        // Club 목록 조회 후 사용자에게 선택 받기
-        String chosenClub = chooseClub(sc);
-        if (chosenClub == null) {
-            // 뒤로가기 선택한 경우
-            return;
+    // ================== Club 메인 메뉴 ==================
+    private static void clubMainMenu(Scanner sc) {
+        while (true) {
+            System.out.println("\n===Club 관리===");
+            System.out.println("1. Club CRUD (등록/조회/수정/삭제)");
+            System.out.println("2. Club 선택 후 하위 엔티티 관리");
+            System.out.println("9. 뒤로가기");
+            System.out.print("선택: ");
+            String choice = sc.nextLine();
+
+            if (choice.equals("1")) {
+                clubCrudMenu(sc);
+            } else if (choice.equals("2")) {
+                String chosenClub = chooseClub(sc);
+                if (chosenClub != null) {
+                    clubEntityMenu(sc, chosenClub);
+                }
+            } else if (choice.equals("9")) {
+                break;
+            } else {
+                System.out.println("잘못된 선택입니다.");
+            }
         }
-        // 선택한 Club에 속한 엔티티 관리 메뉴
-        clubEntityMenu(sc, chosenClub);
+    }
+
+    private static void clubCrudMenu(Scanner sc) {
+        while (true) {
+            System.out.println("\n===Club CRUD===");
+            System.out.println("1. Club 전체 조회");
+            System.out.println("2. Club 단일 조회");
+            System.out.println("3. Club 등록");
+            System.out.println("4. Club 수정(Location)");
+            System.out.println("5. Club 삭제");
+            System.out.println("9. 뒤로가기");
+            System.out.print("선택: ");
+            String choice = sc.nextLine();
+
+            if (choice.equals("1")) {
+                listClubs();
+            } else if (choice.equals("2")) {
+                findClub(sc);
+            } else if (choice.equals("3")) {
+                insertClub(sc);
+            } else if (choice.equals("4")) {
+                updateClub(sc);
+            } else if (choice.equals("5")) {
+                deleteClub(sc);
+            } else if (choice.equals("9")) {
+                break;
+            } else {
+                System.out.println("잘못된 선택입니다.");
+            }
+        }
     }
 
     private static String chooseClub(Scanner sc) {
-        // Club 전체 조회
         String sql = "SELECT Club_Name FROM Club";
-        try (PreparedStatement pstmt = conn.prepareStatement(sql);
+        try (PreparedStatement pstmt = conn.prepareStatement(sql, ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
              ResultSet rs = pstmt.executeQuery()) {
-            System.out.println("\n========Club 목록========");
-            int count = 0;
-            while (rs.next()) {
-                count++;
-                System.out.println(count + ". " + rs.getString("Club_Name"));
-            }
+            System.out.println("\n===Club 목록===");
+            rs.last();
+            int count = rs.getRow();
+            rs.beforeFirst();
             if (count == 0) {
-                System.out.println("등록된 Club이 없습니다. Club 관리 메뉴에서 Club을 먼저 등록해주세요.");
+                System.out.println("등록된 Club이 없습니다. Club CRUD 메뉴에서 Club을 먼저 등록해주세요.");
                 System.out.println("9. 뒤로가기");
                 String back = sc.nextLine();
                 return null;
             } else {
+                int index = 0;
+                while (rs.next()) {
+                    index++;
+                    System.out.println(index + ". " + rs.getString("Club_Name"));
+                }
                 System.out.println("몇 번 Club을 선택하시겠습니까? (9. 뒤로가기)");
                 String choice = sc.nextLine();
                 if (choice.equals("9")) {
@@ -229,8 +274,6 @@ public class ClubManagement {
                         System.out.println("잘못된 선택입니다.");
                         return null;
                     }
-                    // 다시 ResultSet을 사용할 수 없으므로 Club_Name을 재획득하거나 미리 담아둬야 한다.
-                    // 간단히 다시 쿼리:
                     rs.beforeFirst();
                     int current = 0;
                     String selectedClub = null;
@@ -253,9 +296,110 @@ public class ClubManagement {
         }
     }
 
+    private static void listClubs() {
+        String sql = "SELECT * FROM Club";
+        try (PreparedStatement pstmt = conn.prepareStatement(sql);
+             ResultSet rs = pstmt.executeQuery()) {
+            System.out.println("\n=== Club 전체 조회 ===");
+            boolean exist = false;
+            while (rs.next()) {
+                exist = true;
+                System.out.printf("Club_Name: %s, Location: %s, Club_Info: %s\n",
+                        rs.getString("Club_Name"), rs.getString("Location"), rs.getString("Club_Info"));
+            }
+            if (!exist) {
+                System.out.println("등록된 Club이 없습니다.");
+            }
+        } catch (SQLException e) {
+            System.out.println("조회 실패: " + e.getMessage());
+        }
+    }
+
+    private static void findClub(Scanner sc) {
+        try {
+            System.out.print("조회할 Club_Name: ");
+            String clubName = sc.nextLine();
+            String sql = "SELECT * FROM Club WHERE Club_Name = ?";
+            PreparedStatement pstmt = conn.prepareStatement(sql);
+            pstmt.setString(1, clubName);
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) {
+                System.out.println("Club_Name: " + rs.getString("Club_Name"));
+                System.out.println("Location: " + rs.getString("Location"));
+                System.out.println("Club_Info: " + rs.getString("Club_Info"));
+            } else {
+                System.out.println("해당 Club 없음");
+            }
+            rs.close();
+            pstmt.close();
+        } catch (SQLException e) {
+            System.out.println("Club 조회 실패: " + e.getMessage());
+        }
+    }
+
+    private static void insertClub(Scanner sc) {
+        try {
+            System.out.print("Club_Name: ");
+            String clubName = sc.nextLine();
+            System.out.print("Location: ");
+            String location = sc.nextLine();
+            System.out.print("Club_Info: ");
+            String clubInfo = sc.nextLine();
+
+            String sql = "INSERT INTO Club(Club_Name, Location, Club_Info) VALUES(?,?,?)";
+            PreparedStatement pstmt = conn.prepareStatement(sql);
+            pstmt.setString(1, clubName);
+            pstmt.setString(2, location);
+            pstmt.setString(3, clubInfo);
+            int res = pstmt.executeUpdate();
+            if (res > 0) System.out.println("Club 등록 성공");
+            else System.out.println("Club 등록 실패");
+            pstmt.close();
+        } catch (SQLException e) {
+            System.out.println("Club 등록 실패: " + e.getMessage());
+        }
+    }
+
+    private static void updateClub(Scanner sc) {
+        try {
+            System.out.print("수정할 Club_Name: ");
+            String clubName = sc.nextLine();
+            System.out.print("새로운 Location: ");
+            String newLocation = sc.nextLine();
+
+            String sql = "UPDATE Club SET Location = ? WHERE Club_Name = ?";
+            PreparedStatement pstmt = conn.prepareStatement(sql);
+            pstmt.setString(1, newLocation);
+            pstmt.setString(2, clubName);
+            int res = pstmt.executeUpdate();
+            if (res > 0) System.out.println("Club 수정 성공");
+            else System.out.println("수정 실패(Club_Name 확인)");
+            pstmt.close();
+        } catch (SQLException e) {
+            System.out.println("Club 수정 실패: " + e.getMessage());
+        }
+    }
+
+    private static void deleteClub(Scanner sc) {
+        try {
+            System.out.print("삭제할 Club_Name: ");
+            String clubName = sc.nextLine();
+
+            String sql = "DELETE FROM Club WHERE Club_Name = ?";
+            PreparedStatement pstmt = conn.prepareStatement(sql);
+            pstmt.setString(1, clubName);
+            int res = pstmt.executeUpdate();
+            if (res > 0) System.out.println("Club 삭제 성공");
+            else System.out.println("삭제 실패(Club_Name 확인)");
+            pstmt.close();
+        } catch (SQLException e) {
+            System.out.println("Club 삭제 실패: " + e.getMessage());
+        }
+    }
+
     private static void clubEntityMenu(Scanner sc, String clubName) {
         while (true) {
-            System.out.println("\n========Club 관련 엔티티 관리========");
+            System.out.println("\n===Club 관련 엔티티 관리===");
             System.out.println("선택한 Club: " + clubName);
             System.out.println("1. Board");
             System.out.println("2. Notice/Event");
@@ -287,10 +431,10 @@ public class ClubManagement {
         }
     }
 
-    // ================== Board CRUD with Club context ==================
+    // Board
     private static void boardMenu(Scanner sc, String clubName) {
         while (true) {
-            System.out.println("\n========Board 관리 (" + clubName + ")========");
+            System.out.println("\n===Board 관리 (" + clubName + ")===");
             System.out.println("1. Board 등록");
             System.out.println("2. Board 조회");
             System.out.println("3. Board 수정(Board_Type)");
@@ -397,10 +541,10 @@ public class ClubManagement {
         }
     }
 
-    // ================== Notice/Event with Club context ==================
+    // Notice/Event
     private static void noticeEventMenu(Scanner sc, String clubName) {
         while (true) {
-            System.out.println("\n=========Notice/Event 관리 (" + clubName + ")========");
+            System.out.println("\n===Notice/Event 관리 (" + clubName + ")===");
             System.out.println("1. Notice/Event 등록");
             System.out.println("2. Notice/Event 조회");
             System.out.println("3. Notice/Event 수정(Title)");
@@ -425,7 +569,6 @@ public class ClubManagement {
         }
     }
 
-    // Notice/Event
     private static void insertNoticeEvent(Scanner sc) {
         try {
             System.out.print("NoticeEvent_ID: ");
@@ -529,7 +672,7 @@ public class ClubManagement {
     // Report
     private static void reportMenu(Scanner sc, String clubName) {
         while (true) {
-            System.out.println("\n========Report 관리 (" + clubName + ")========");
+            System.out.println("\n===Report 관리 (" + clubName + ")===");
             System.out.println("1. Report 등록");
             System.out.println("2. Report 조회");
             System.out.println("3. Report 수정(Activity_Statistics)");
@@ -651,7 +794,7 @@ public class ClubManagement {
     // Budget
     private static void budgetMenu(Scanner sc, String clubName) {
         while (true) {
-            System.out.println("\n========Budget 관리 (" + clubName + ")========");
+            System.out.println("\n===Budget 관리 (" + clubName + ")===");
             System.out.println("1. Budget 등록");
             System.out.println("2. Budget 조회");
             System.out.println("3. Budget 수정(Amount)");
@@ -777,7 +920,7 @@ public class ClubManagement {
     // Study_Group
     private static void studyGroupMenu(Scanner sc, String clubName) {
         while (true) {
-            System.out.println("\n========Study_Group 관리 (" + clubName + ")========");
+            System.out.println("\n===Study_Group 관리 (" + clubName + ")===");
             System.out.println("1. Study_Group 등록");
             System.out.println("2. Study_Group 조회");
             System.out.println("3. Study_Group 수정(Activity)");
@@ -888,7 +1031,7 @@ public class ClubManagement {
     // Chat
     private static void chatMenu(Scanner sc, String clubName) {
         while (true) {
-            System.out.println("\n========Chat 관리 (" + clubName + ")========");
+            System.out.println("\n===Chat 관리 (" + clubName + ")===");
             System.out.println("1. Chat 등록");
             System.out.println("2. Chat 조회");
             System.out.println("3. Chat 수정(Timestamp)");
@@ -1014,7 +1157,7 @@ public class ClubManagement {
     // Facility
     private static void facilityMenu(Scanner sc) {
         while (true) {
-            System.out.println("\n========Facility 관리========");
+            System.out.println("\n===Facility 관리===");
             System.out.println("1. Facility 등록");
             System.out.println("2. Facility 조회");
             System.out.println("3. Facility 수정(Capacity)");
@@ -1138,10 +1281,10 @@ public class ClubManagement {
         }
     }
 
-    // ================== 예약 관리 (시설 예약, 취소) ==================
+    // ================== 예약 관리 ==================
     private static void reservationMenu(Scanner sc) {
         while (true) {
-            System.out.println("\n========예약 관리========");
+            System.out.println("\n===예약 관리===");
             System.out.println("1. 시설 예약");
             System.out.println("2. 예약 취소");
             System.out.println("9. 뒤로가기");
