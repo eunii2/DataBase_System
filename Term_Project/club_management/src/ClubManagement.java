@@ -407,6 +407,7 @@ public class ClubManagement {
             System.out.println("4. Budget");
             System.out.println("5. Study_Group");
             System.out.println("6. Chat");
+            System.out.println("7. Facility");
             System.out.println("9. 뒤로가기");
             System.out.print("선택: ");
             String choice = sc.nextLine();
@@ -423,6 +424,8 @@ public class ClubManagement {
                 studyGroupMenu(sc, clubName);
             } else if (choice.equals("6")) {
                 chatMenu(sc, clubName);
+            } else if (choice.equals("7")) {
+                facilityMenu(sc);
             } else if (choice.equals("9")) {
                 break;
             } else {
